@@ -26,6 +26,8 @@ use windows::Win32::Graphics::Dxgi::Common::*;
 
 use crate::texture::TexturePool;
 
+/// The core of this crate. You can set up a renderer via [`Renderer::new`]
+/// and render the output from `egui` with [`Renderer::render`].
 pub struct Renderer {
     device: ID3D11Device,
 
@@ -39,12 +41,24 @@ pub struct Renderer {
     texture_pool: TexturePool,
 }
 
+/// Part of [`egui::FullOutput`] that is consumed by [`Renderer::render`].
+/// 
+/// Call to [`egui::Context::run`] or [`egui::Context::end_frame`] yields a
+/// [`egui::FullOutput`]. The platform integration (for example `egui_winit`)
+/// consumes [`egui::FullOutput::platform_output`] and [`egui::FullOutput::viewport_output`],
+/// and the renderer consumes the rest.
+/// 
+/// To conveniently split a [`egui::FullOutput`] into a [`RendererOutput`] and
+/// outputs for the platform integration, use [`split_output`].
+#[allow(missing_docs)]
 pub struct RendererOutput {
     pub textures_delta: TexturesDelta,
     pub shapes: Vec<ClippedShape>,
     pub pixels_per_point: f32,
 }
 
+/// Convenience method to split a [`egui::FullOutput`] into the [`RendererOutput`]
+/// part and other parts for platform integration.
 pub fn split_output(full_output: egui::FullOutput) -> (
     RendererOutput,
     egui::PlatformOutput,
@@ -60,6 +74,8 @@ pub fn split_output(full_output: egui::FullOutput) -> (
 )}
 
 impl Renderer {
+    /// Create a [`Renderer`] using the provided D3D11 device. The [`Renderer`]
+    /// holds various D3D11 resources and states derived from the device.
     pub fn new(device: &ID3D11Device)-> Result<Self> {
         let input_layout = crate::unwrap(|ret_| unsafe {
             device.CreateInputLayout(
@@ -98,6 +114,23 @@ impl Renderer {
         })
     }
 
+    /// Render the output of `egui` to the provided render target using the
+    /// provided device context. The render target should use a linear color
+    /// space (e.g. `DXGI_FORMAT_R8G8B8A8_UNORM_SRGB`) for proper results.
+    /// 
+    /// The `scale_factor` should be the scale factor of your window and not
+    /// confused with [`egui::Context::zoom_factor`]. If you are using `winit`,
+    /// the `scale_factor` can be aquired using `Window::scale_factor`.
+    /// 
+    /// Note that this function does not maintain the current state of the
+    /// D3D11 graphics pipeline. Particularly, it calls
+    /// [`ID3D11DeviceContext::ClearState`](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicecontext-clearstate)
+    /// before returning, so it is all *your* responsibility to backup the
+    /// current pipeline state and restore it afterwards if your rendering
+    /// pipeline depends on it.
+    /// 
+    /// See the [`egui-demo`](https://github.com/Nekomaru-PKU/egui-directx11/blob/main/examples/egui-demo/src/main.rs)
+    /// example for code examples.
     pub fn render(
         &mut self,
         device_context: &ID3D11DeviceContext,
