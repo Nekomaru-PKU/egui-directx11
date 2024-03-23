@@ -74,8 +74,8 @@ pub fn split_output(full_output: egui::FullOutput) -> (
 )}
 
 impl Renderer {
-    /// Create a [`Renderer`] using the provided D3D11 device. The [`Renderer`]
-    /// holds various D3D11 resources and states derived from the device.
+    /// Create a [`Renderer`] using the provided Direct3D11 device. The [`Renderer`]
+    /// holds various Direct3D11 resources and states derived from the device.
     pub fn new(device: &ID3D11Device)-> Result<Self> {
         let input_layout = crate::unwrap(|ret_| unsafe {
             device.CreateInputLayout(
@@ -123,13 +123,13 @@ impl Renderer {
     /// the `scale_factor` can be aquired using `Window::scale_factor`.
     /// 
     /// Note that this function does not maintain the current state of the
-    /// D3D11 graphics pipeline. Particularly, it calls
+    /// Direct3D11 graphics pipeline. Particularly, it calls
     /// [`ID3D11DeviceContext::ClearState`](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicecontext-clearstate)
     /// before returning, so it is all *your* responsibility to backup the
     /// current pipeline state and restore it afterwards if your rendering
     /// pipeline depends on it.
     /// 
-    /// See the [`egui-demo`](https://github.com/Nekomaru-PKU/egui-directx11/blob/main/examples/egui-demo/src/main.rs)
+    /// See the [`egui-demo`](https://github.com/Nekomaru-PKU/egui-directx11/blob/main/examples/egui-demo.rs)
     /// example for code examples.
     pub fn render(
         &mut self,
