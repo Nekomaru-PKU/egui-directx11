@@ -4,8 +4,10 @@ use std::mem;
 use egui::Pos2;
 use egui::Rgba;
 use egui::ClippedPrimitive;
+use egui::epaint::ClippedShape;
 use egui::epaint::Primitive;
 use egui::epaint::Vertex;
+use egui::epaint::textures::TexturesDelta;
 
 #[repr(C)]
 struct VertexInput {
@@ -36,6 +38,26 @@ pub struct Renderer {
 
     texture_pool: TexturePool,
 }
+
+pub struct RendererOutput {
+    pub textures_delta: TexturesDelta,
+    pub shapes: Vec<ClippedShape>,
+    pub pixels_per_point: f32,
+}
+
+pub fn split_output(full_output: egui::FullOutput) -> (
+    RendererOutput,
+    egui::PlatformOutput,
+    egui::ViewportIdMap<egui::ViewportOutput>
+) {(
+    RendererOutput {
+        textures_delta: full_output.textures_delta,
+        shapes: full_output.shapes,
+        pixels_per_point: full_output.pixels_per_point
+    },
+    full_output.platform_output,
+    full_output.viewport_output,
+)}
 
 impl Renderer {
     pub fn new(device: &ID3D11Device)-> Result<Self> {
@@ -81,7 +103,7 @@ impl Renderer {
         device_context: &ID3D11DeviceContext,
         render_target: &ID3D11RenderTargetView,
         egui_ctx: &egui::Context,
-        egui_output: egui::FullOutput,
+        egui_output: RendererOutput,
         scale_factor: f32,
     )-> Result<()> {
         self.texture_pool.update(device_context, egui_output.textures_delta)?;

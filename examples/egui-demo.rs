@@ -83,15 +83,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     panic!("fail to resize framebuffers: {err:?}");
                 },
                 WindowEvent::RedrawRequested => if let Some(render_target) = &render_target {
-                    let input = egui_winit.take_egui_input(&window);
-                    egui_ctx.begin_frame(input);
-
-                    egui_demo.ui(&egui_ctx);
-
-                    let mut egui_output = egui_ctx.end_frame();
-                    egui_winit.handle_platform_output(
-                        &window,
-                        std::mem::take(&mut egui_output.platform_output));
+                    let egui_input = egui_winit.take_egui_input(&window);
+                    let egui_output = egui_ctx.run(egui_input, |ctx| {
+                        egui_demo.ui(ctx);
+                    });
+                    let (
+                        renderer_output,
+                        platform_output,
+                        _,
+                    ) = egui_directx11::split_output(egui_output);
+                    egui_winit.handle_platform_output(&window, platform_output);
 
                     unsafe {
                         device_context.ClearRenderTargetView(
@@ -102,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         &device_context,
                         render_target,
                         &egui_ctx,
-                        egui_output,
+                        renderer_output,
                         window.scale_factor() as _);
                     let _ = unsafe { swap_chain.Present(1, 0) };
                 } else { unreachable!() }, _ => ()
