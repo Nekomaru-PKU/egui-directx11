@@ -53,7 +53,7 @@ impl TexturePool {
                 // the old texture is returned and dropped here, freeing
                 // all its gpu resource.
             } else if let Some(tex) = self.pool.get_mut(&tid) {
-                Self::update_partial(&ctx, tex, delta.image, delta.pos.unwrap())?;
+                Self::update_partial(ctx, tex, delta.image, delta.pos.unwrap())?;
             } else {
                 log::warn!("egui wants to update a non-existing texture {:?}. this request will be ignored.", tid);
             }
