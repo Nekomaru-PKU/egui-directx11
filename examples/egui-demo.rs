@@ -22,24 +22,16 @@ use winit::{
         HasWindowHandle,
         RawWindowHandle,
     },
-    window::{
-        WindowBuilder,
-        WindowButtons,
-    },
+    window::WindowBuilder,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
-    let frame_width = 1600;
-    let frame_height = 900;
-
     let event_loop = EventLoop::new()?;
     let window = WindowBuilder::new()
         .with_title("egui-directx11")
-        .with_inner_size(PhysicalSize::new(frame_width, frame_height))
-        .with_resizable(false)
-        .with_enabled_buttons(WindowButtons::CLOSE | WindowButtons::MINIMIZE)
+        .with_inner_size(PhysicalSize::new(1600, 900))
         .build(&event_loop)?;
     let hwnd = if let RawWindowHandle::Win32(raw) =
         window.window_handle()?.as_raw() {
@@ -48,17 +40,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         panic!("unexpected RawWindowHandle variant");
     };
 
+    let frame_size = window.inner_size();
     let (
         device,
         device_context,
         swap_chain,
-        _,
-        framebuffer_rtv,
     ) = create_device_and_swap_chain(
         hwnd,
-        frame_width,
-        frame_height,
+        frame_size.width,
+        frame_size.height,
         DXGI_FORMAT_R8G8B8A8_UNORM_SRGB)?;
+    let mut render_target = Some(
+        create_render_target_for_swap_chain(&device, &swap_chain)?);
 
     let egui_ctx = egui::Context::default();
     let mut egui_renderer = egui_directx11::Renderer::new(&device)?;
@@ -77,7 +70,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if egui_winit.on_window_event(&window, &event).consumed { return; }
             match event {
                 WindowEvent::CloseRequested => control_flow.exit(),
-                WindowEvent::RedrawRequested => {
+                WindowEvent::Resized(PhysicalSize {
+                    width: new_width,
+                    height: new_height,
+                }) => if let Err(err) = resize_swap_chain_and_render_target(
+                    &device,
+                    &swap_chain,
+                    &mut render_target,
+                    new_width,
+                    new_height,
+                    DXGI_FORMAT_R8G8B8A8_UNORM_SRGB) {
+                    panic!("fail to resize framebuffers: {err:?}");
+                },
+                WindowEvent::RedrawRequested => if let Some(render_target) = &render_target {
                     let input = egui_winit.take_egui_input(&window);
                     egui_ctx.begin_frame(input);
 
@@ -90,20 +95,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     unsafe {
                         device_context.ClearRenderTargetView(
-                            &framebuffer_rtv, 
+                            render_target, 
                             &[0.0, 0.0, 0.0, 1.0]);
                     }
                     let _ = egui_renderer.render(
                         &device_context,
-                        &framebuffer_rtv,
+                        render_target,
                         &egui_ctx,
                         egui_output,
                         window.scale_factor() as _);
                     let _ = unsafe { swap_chain.Present(1, 0) };
-                }, _ => ()
+                } else { unreachable!() }, _ => ()
             }
         }, _ => ()
     })?;
+    Ok(())
+}
+
+fn resize_swap_chain_and_render_target(
+    device: &ID3D11Device,
+    swap_chain: &IDXGISwapChain,
+    render_target: &mut Option<ID3D11RenderTargetView>,
+    new_width: u32,
+    new_height: u32,
+    new_format: DXGI_FORMAT,
+)-> windows::core::Result<()> {
+    render_target.take();
+    unsafe {
+        swap_chain.ResizeBuffers(
+            2,
+            new_width,
+            new_height,
+            new_format,
+            0)
+    }?;
+    render_target.replace(
+        create_render_target_for_swap_chain(device, swap_chain)?);
     Ok(())
 }
 
@@ -115,9 +142,7 @@ fn create_device_and_swap_chain(
 )-> windows::core::Result<(
     ID3D11Device,
     ID3D11DeviceContext,
-    IDXGISwapChain,
-    ID3D11Texture2D,
-    ID3D11RenderTargetView)> {
+    IDXGISwapChain)> {
     let dxgi_factory: IDXGIFactory = unsafe { CreateDXGIFactory() }?;
     let dxgi_adapter: IDXGIAdapter = unsafe { dxgi_factory.EnumAdapters(0) }?;
 
@@ -175,22 +200,22 @@ fn create_device_and_swap_chain(
             window,
             DXGI_MWA_NO_ALT_ENTER)
     }?;
+    Ok((device, device_context, swap_chain))
+}
 
-    let framebuffer = unsafe { swap_chain.GetBuffer(0) }?;
-    let mut framebuffer_rtv = None;
+fn create_render_target_for_swap_chain(
+    device: &ID3D11Device,
+    swap_chain: &IDXGISwapChain,
+)-> windows::core::Result<ID3D11RenderTargetView> {
+    let swap_chain_texture = unsafe {
+        swap_chain.GetBuffer::<ID3D11Texture2D>(0)
+    }?;
+    let mut render_target = None;
     unsafe {
         device.CreateRenderTargetView(
-            &framebuffer,
+            &swap_chain_texture,
             None,
-            Some(&mut framebuffer_rtv))
+            Some(&mut render_target))
     }?;
-    let framebuffer_rtv = framebuffer_rtv.unwrap();
-
-    Ok((
-        device,
-        device_context,
-        swap_chain,
-        framebuffer,
-        framebuffer_rtv,
-    ))
+    Ok(render_target.unwrap())
 }
