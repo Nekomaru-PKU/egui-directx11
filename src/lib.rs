@@ -57,7 +57,6 @@ use windows::{
     },
 };
 
-
 /// The core of this crate. You can set up a renderer via [`Renderer::new`]
 /// and render the output from `egui` with [`Renderer::render`].
 pub struct Renderer {
@@ -122,6 +121,10 @@ struct MeshData {
 impl Renderer {
     /// Create a [`Renderer`] using the provided Direct3D11 device. The [`Renderer`]
     /// holds various Direct3D11 resources and states derived from the device.
+    /// 
+    /// If any Direct3D resource creation fails, this function will return an error.
+    /// You can create the Direct3D11 device with debug layer enabled to find out
+    /// details on the error.
     pub fn new(device: &ID3D11Device)-> Result<Self> {
         let mut input_layout = None;
         let mut vertex_shader = None;
@@ -172,11 +175,18 @@ impl Renderer {
     /// confused with [`egui::Context::zoom_factor`]. If you are using `winit`,
     /// the `scale_factor` can be aquired using `Window::scale_factor`.
     /// 
+    /// If any Direct3D resource creation fails, this function will return an error.
+    /// In this case you may have a incomplete or incorrect rendering result.
+    /// You can create the Direct3D11 device with debug layer enabled to find out
+    /// details on the error.
+    /// If the device has been lost, you should drop the [`Renderer`] and create
+    /// a new one.
+    /// 
     /// Note that this function does not maintain the current state of the
     /// Direct3D11 graphics pipeline. Particularly, it calls
     /// [`ID3D11DeviceContext::ClearState`](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicecontext-clearstate)
-    /// before returning, so it is all *your* responsibility to backup the
-    /// current pipeline state and restore it afterwards if your rendering
+    /// before and after rendering, so it is all *your* responsibility to backup
+    /// the current pipeline state and restore it afterwards if your rendering
     /// pipeline depends on it.
     /// 
     /// See the [`egui-demo`](https://github.com/Nekomaru-PKU/egui-directx11/blob/main/examples/egui-demo.rs)
