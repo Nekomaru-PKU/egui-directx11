@@ -10,14 +10,18 @@ use std::collections::HashMap;
 use std::mem;
 use std::slice;
 
-use egui::Color32;
-use egui::ImageData;
-use egui::TextureId;
-use egui::TexturesDelta;
+use egui::{
+    Color32,
+    ImageData,
+    TextureId,
+    TexturesDelta,
+};
 
 use windows::core::Result;
-use windows::Win32::Graphics::Direct3D11::*;
-use windows::Win32::Graphics::Dxgi::Common::*;
+use windows::Win32::Graphics::{
+    Dxgi::Common::*,
+    Direct3D11::*,
+};
 
 struct Texture {
     tex: ID3D11Texture2D,
@@ -55,7 +59,7 @@ impl TexturePool {
             } else if let Some(tex) = self.pool.get_mut(&tid) {
                 Self::update_partial(ctx, tex, delta.image, delta.pos.unwrap())?;
             } else {
-                log::warn!("egui wants to update a non-existing texture {:?}. this request will be ignored.", tid);
+                log::warn!("egui wants to update a non-existing texture {tid:?}. this request will be ignored.");
             }
         }
         for tid in delta.free {
@@ -118,8 +122,8 @@ impl TexturePool {
         device: &ID3D11Device,
         data: ImageData,
     )-> Result<Texture> {
-        // rust is cringe sometimes
         let width = data.width();
+
         let pixels = match &data {
             ImageData::Color(c) => c.pixels.clone(),
             ImageData::Font(f) => f
@@ -144,17 +148,29 @@ impl TexturePool {
             CPUAccessFlags: D3D11_CPU_ACCESS_WRITE.0 as _,
             ..Default::default()
         };
+
         let subresource_data = D3D11_SUBRESOURCE_DATA {
             pSysMem: pixels.as_ptr() as _,
             SysMemPitch: (width * mem::size_of::<Color32>()) as u32,
             SysMemSlicePitch: 0,
         };
-        let tex = crate::unwrap(|ret_| unsafe {
-            device.CreateTexture2D(&desc, Some(&subresource_data), ret_)
-        })?;
-        let srv = crate::unwrap(|ret_| unsafe {
-            device.CreateShaderResourceView(&tex, None, ret_)
-        })?;
+
+        let mut tex = None;
+        unsafe { device.CreateTexture2D(
+            &desc,
+            Some(&subresource_data),
+            Some(&mut tex))
+        }?;
+        let tex = tex.unwrap();
+
+        let mut srv = None;
+        unsafe { device.CreateShaderResourceView(
+            &tex,
+            None,
+            Some(&mut srv))
+        }?;
+        let srv = srv.unwrap();
+
         Ok(Texture {
             tex,
             srv,

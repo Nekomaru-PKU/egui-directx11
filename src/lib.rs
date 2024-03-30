@@ -22,13 +22,439 @@
 //! with Direct3D11 and `egui`. This example uses `winit` for window management and
 //! event handling, while native Win32 APIs should also work well.
 
-mod renderer;
 mod texture;
-mod utils;
-use utils::*;
+use texture::TexturePool;
 
-pub use renderer::{
-    Renderer,
-    RendererOutput,
-    split_output,
+use std::mem;
+
+const fn zeroed<T>() -> T { unsafe { mem::zeroed() }}
+
+use egui::{
+    ClippedPrimitive,
+    Pos2,
+    Rgba,
 };
+use egui::epaint::{
+    ClippedShape,
+    Primitive,
+    Vertex,
+    textures::TexturesDelta,
+};
+
+use windows::{
+    core::{
+        Result,
+        Interface,
+    },
+    Win32::Foundation::{
+        BOOL,
+        RECT,
+    },
+    Win32::Graphics::{
+        Dxgi::Common::*,
+        Direct3D::*,
+        Direct3D11::*,
+    },
+};
+
+
+/// The core of this crate. You can set up a renderer via [`Renderer::new`]
+/// and render the output from `egui` with [`Renderer::render`].
+pub struct Renderer {
+    device: ID3D11Device,
+
+    input_layout: ID3D11InputLayout,
+    vertex_shader: ID3D11VertexShader,
+    pixel_shader: ID3D11PixelShader,
+    rasterizer_state: ID3D11RasterizerState,
+    sampler_state: ID3D11SamplerState,
+    blend_state: ID3D11BlendState,
+
+    texture_pool: TexturePool,
+}
+
+/// Part of [`egui::FullOutput`] that is consumed by [`Renderer::render`].
+/// 
+/// Call to [`egui::Context::run`] or [`egui::Context::end_frame`] yields a
+/// [`egui::FullOutput`]. The platform integration (for example `egui_winit`)
+/// consumes [`egui::FullOutput::platform_output`] and [`egui::FullOutput::viewport_output`],
+/// and the renderer consumes the rest.
+/// 
+/// To conveniently split a [`egui::FullOutput`] into a [`RendererOutput`] and
+/// outputs for the platform integration, use [`split_output`].
+#[allow(missing_docs)]
+pub struct RendererOutput {
+    pub textures_delta: TexturesDelta,
+    pub shapes: Vec<ClippedShape>,
+    pub pixels_per_point: f32,
+}
+
+/// Convenience method to split a [`egui::FullOutput`] into the [`RendererOutput`]
+/// part and other parts for platform integration.
+pub fn split_output(full_output: egui::FullOutput) -> (
+    RendererOutput,
+    egui::PlatformOutput,
+    egui::ViewportIdMap<egui::ViewportOutput>
+) {(
+    RendererOutput {
+        textures_delta: full_output.textures_delta,
+        shapes: full_output.shapes,
+        pixels_per_point: full_output.pixels_per_point
+    },
+    full_output.platform_output,
+    full_output.viewport_output,
+)}
+
+#[repr(C)]
+struct VertexData {
+    pos: Pos2,
+    uv: Pos2,
+    color: Rgba,
+}
+
+struct MeshData {
+    vtx: Vec<VertexData>,
+    idx: Vec<u32>,
+    tex: egui::TextureId,
+    clip_rect: egui::Rect,
+}
+
+impl Renderer {
+    /// Create a [`Renderer`] using the provided Direct3D11 device. The [`Renderer`]
+    /// holds various Direct3D11 resources and states derived from the device.
+    pub fn new(device: &ID3D11Device)-> Result<Self> {
+        let mut input_layout = None;
+        let mut vertex_shader = None;
+        let mut pixel_shader = None;
+        let mut rasterizer_state = None;
+        let mut sampler_state = None;
+        let mut blend_state = None;
+        unsafe {
+            device.CreateInputLayout(
+                &Self::INPUT_ELEMENTS_DESC,
+                Self::VS_BLOB,
+                Some(&mut input_layout))?;
+            device.CreateVertexShader(
+                Self::VS_BLOB,
+                None,
+                Some(&mut vertex_shader))?;
+            device.CreatePixelShader(
+                Self::PS_BLOB,
+                None,
+                Some(&mut pixel_shader))?;
+            device.CreateRasterizerState(
+                &Self::RASTERIZER_DESC,
+                Some(&mut rasterizer_state))?;
+            device.CreateSamplerState(
+                &Self::SAMPLER_DESC,
+                Some(&mut sampler_state))?;
+            device.CreateBlendState(
+                &Self::BLEND_DESC,
+                Some(&mut blend_state))?;
+        };
+        Ok(Self {
+            device: device.clone(),
+            input_layout: input_layout.unwrap(),
+            vertex_shader: vertex_shader.unwrap(),
+            pixel_shader: pixel_shader.unwrap(),
+            rasterizer_state: rasterizer_state.unwrap(),
+            sampler_state: sampler_state.unwrap(),
+            blend_state: blend_state.unwrap(),
+            texture_pool: TexturePool::new(device),
+        })
+    }
+
+    /// Render the output of `egui` to the provided render target using the
+    /// provided device context. The render target should use a linear color
+    /// space (e.g. `DXGI_FORMAT_R8G8B8A8_UNORM_SRGB`) for proper results.
+    /// 
+    /// The `scale_factor` should be the scale factor of your window and not
+    /// confused with [`egui::Context::zoom_factor`]. If you are using `winit`,
+    /// the `scale_factor` can be aquired using `Window::scale_factor`.
+    /// 
+    /// Note that this function does not maintain the current state of the
+    /// Direct3D11 graphics pipeline. Particularly, it calls
+    /// [`ID3D11DeviceContext::ClearState`](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicecontext-clearstate)
+    /// before returning, so it is all *your* responsibility to backup the
+    /// current pipeline state and restore it afterwards if your rendering
+    /// pipeline depends on it.
+    /// 
+    /// See the [`egui-demo`](https://github.com/Nekomaru-PKU/egui-directx11/blob/main/examples/egui-demo.rs)
+    /// example for code examples.
+    pub fn render(
+        &mut self,
+        device_context: &ID3D11DeviceContext,
+        render_target: &ID3D11RenderTargetView,
+        egui_ctx: &egui::Context,
+        egui_output: RendererOutput,
+        scale_factor: f32,
+    )-> Result<()> {
+        self.texture_pool.update(device_context, egui_output.textures_delta)?;
+
+        if egui_output.shapes.is_empty() { return Ok(()); }
+
+        let frame_size = Self::get_render_target_size(render_target)?;
+        let frame_size_scaled = (
+            frame_size.0 as f32 / scale_factor,
+            frame_size.1 as f32 / scale_factor);
+        let zoom_factor = egui_ctx.zoom_factor();
+
+        self.setup(
+            device_context,
+            render_target,
+            frame_size);
+        let meshes = egui_ctx
+            .tessellate(egui_output.shapes, egui_output.pixels_per_point)
+            .into_iter()
+            .filter_map(|ClippedPrimitive { primitive, clip_rect }| match primitive {
+                Primitive::Mesh(mesh) => Some((mesh, clip_rect)),
+                Primitive::Callback(..) => {
+                    log::warn!("paint callbacks are not yet supported.");
+                    None
+                }
+            })
+            .filter_map(|(mesh, clip_rect)| {
+                if mesh.indices.is_empty() { return None; }
+                if mesh.indices.len() % 3 != 0 {
+                    log::warn!(concat!(
+                        "egui wants to draw a incomplete triangle. ",
+                        "this request will be ignored."));
+                    return None;
+                }
+                Some(MeshData {
+                    vtx: mesh.vertices.into_iter()
+                        .map(|Vertex { pos, uv, color }| VertexData {
+                            pos: Pos2::new(
+                                pos.x * zoom_factor / frame_size_scaled.0 * 2.0 - 1.0,
+                                1.0 - pos.y * zoom_factor / frame_size_scaled.1 * 2.0),
+                            uv,
+                            color: color.into(),
+                        })
+                        .collect(),
+                    idx: mesh.indices,
+                    tex: mesh.texture_id,
+                    clip_rect: clip_rect * scale_factor * zoom_factor,
+                })
+            });
+        for mesh in meshes {
+            Self::draw_mesh(
+                &self.device,
+                device_context,
+                &self.texture_pool,
+                mesh)?;
+        }
+        unsafe { device_context.ClearState() };
+        Ok(())
+    }
+
+    fn setup(
+        &mut self,
+        device_context: &ID3D11DeviceContext,
+        render_target: &ID3D11RenderTargetView,
+        frame_size: (u32, u32)) {
+        unsafe {
+            device_context.ClearState();
+            device_context.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            device_context.IASetInputLayout(&self.input_layout);
+            device_context.VSSetShader(&self.vertex_shader, Some(&[]));
+            device_context.PSSetShader(&self.pixel_shader, Some(&[]));
+            device_context.RSSetState(&self.rasterizer_state);
+            device_context.RSSetViewports(Some(&[D3D11_VIEWPORT {
+                TopLeftX: 0.,
+                TopLeftY: 0.,
+                Width : frame_size.0 as _,
+                Height: frame_size.1 as _,
+                MinDepth: 0.,
+                MaxDepth: 1.,
+            }]));
+            device_context.PSSetSamplers(
+                0,
+                Some(&[Some(self.sampler_state.clone())]));
+            device_context.OMSetRenderTargets(
+                Some(&[Some(render_target.clone())]),
+                None);
+            device_context.OMSetBlendState(
+                &self.blend_state,
+                Some(&[0.; 4]),
+                u32::MAX);
+        }
+    }
+
+    fn draw_mesh(
+        device: &ID3D11Device,
+        device_context: &ID3D11DeviceContext,
+        texture_pool: &TexturePool,
+        mesh: MeshData,
+    )-> Result<()> {
+        let vb = Self::create_index_buffer(device, &mesh.idx)?;
+        let ib = Self::create_vertex_buffer(device, &mesh.vtx)?;
+        unsafe {
+            device_context.IASetVertexBuffers(
+                0,
+                1,
+                Some(&Some(ib)),
+                Some(&(mem::size_of::<VertexData>() as _)),
+                Some(&0),
+            );
+            device_context.IASetIndexBuffer(
+                &vb,
+                DXGI_FORMAT_R32_UINT,
+                0);
+                device_context.RSSetScissorRects(Some(&[RECT {
+                left  : mesh.clip_rect.left() as _,
+                top   : mesh.clip_rect.top() as _,
+                right : mesh.clip_rect.right() as _,
+                bottom: mesh.clip_rect.bottom() as _,
+            }]));
+        }
+        if let Some(srv) = texture_pool.get_srv(mesh.tex) {
+            unsafe { device_context.PSSetShaderResources(
+                0,
+                Some(&[Some(srv)]))
+            };
+        } else {
+            log::warn!(
+                concat!(
+                    "egui wants to sample a non-existing texture {:?}.",
+                    "this request will be ignored."),
+                mesh.tex);
+        };
+        unsafe { device_context.DrawIndexed(
+            mesh.idx.len() as _,
+            0,
+            0)
+        };
+        Ok(())
+    }
+}
+
+impl Renderer {
+    const VS_BLOB: &'static [u8] = include_bytes!("../shaders/egui_vs.bin");
+    const PS_BLOB: &'static [u8] = include_bytes!("../shaders/egui_ps.bin");
+
+    const INPUT_ELEMENTS_DESC: [D3D11_INPUT_ELEMENT_DESC; 3] = [
+        D3D11_INPUT_ELEMENT_DESC {
+            SemanticName: windows::core::s!("POSITION"),
+            SemanticIndex: 0,
+            Format: DXGI_FORMAT_R32G32_FLOAT,
+            InputSlot: 0,
+            AlignedByteOffset: 0,
+            InputSlotClass: D3D11_INPUT_PER_VERTEX_DATA,
+            InstanceDataStepRate: 0,
+        },
+        D3D11_INPUT_ELEMENT_DESC {
+            SemanticName: windows::core::s!("TEXCOORD"),
+            SemanticIndex: 0,
+            Format: DXGI_FORMAT_R32G32_FLOAT,
+            InputSlot: 0,
+            AlignedByteOffset: D3D11_APPEND_ALIGNED_ELEMENT,
+            InputSlotClass: D3D11_INPUT_PER_VERTEX_DATA,
+            InstanceDataStepRate: 0,
+        },
+        D3D11_INPUT_ELEMENT_DESC {
+            SemanticName: windows::core::s!("COLOR"),
+            SemanticIndex: 0,
+            Format: DXGI_FORMAT_R32G32B32A32_FLOAT,
+            InputSlot: 0,
+            AlignedByteOffset: D3D11_APPEND_ALIGNED_ELEMENT,
+            InputSlotClass: D3D11_INPUT_PER_VERTEX_DATA,
+            InstanceDataStepRate: 0,
+        },
+    ];
+
+    const RASTERIZER_DESC: D3D11_RASTERIZER_DESC = D3D11_RASTERIZER_DESC {
+        FillMode: D3D11_FILL_SOLID,
+        CullMode: D3D11_CULL_NONE,
+        FrontCounterClockwise: BOOL(0),
+        DepthBias: 0,
+        DepthBiasClamp: 0.,
+        SlopeScaledDepthBias: 0.,
+        DepthClipEnable: BOOL(0),
+        ScissorEnable: BOOL(1),
+        MultisampleEnable: BOOL(0),
+        AntialiasedLineEnable: BOOL(0),
+    };
+
+    const SAMPLER_DESC: D3D11_SAMPLER_DESC = D3D11_SAMPLER_DESC {
+        Filter: D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+        AddressU: D3D11_TEXTURE_ADDRESS_BORDER,
+        AddressV: D3D11_TEXTURE_ADDRESS_BORDER,
+        AddressW: D3D11_TEXTURE_ADDRESS_BORDER,
+        ComparisonFunc: D3D11_COMPARISON_ALWAYS,
+        BorderColor: [1., 1., 1., 1.],
+        .. self::zeroed()
+    };
+
+    const BLEND_DESC: D3D11_BLEND_DESC = D3D11_BLEND_DESC {
+        RenderTarget: [
+            D3D11_RENDER_TARGET_BLEND_DESC {
+                BlendEnable: BOOL(1),
+                SrcBlend: D3D11_BLEND_SRC_ALPHA,
+                DestBlend: D3D11_BLEND_INV_SRC_ALPHA,
+                BlendOp: D3D11_BLEND_OP_ADD,
+                SrcBlendAlpha: D3D11_BLEND_ONE,
+                DestBlendAlpha: D3D11_BLEND_INV_SRC_ALPHA,
+                BlendOpAlpha: D3D11_BLEND_OP_ADD,
+                RenderTargetWriteMask: D3D11_COLOR_WRITE_ENABLE_ALL.0 as _,
+            },
+            self::zeroed(),
+            self::zeroed(),
+            self::zeroed(),
+            self::zeroed(),
+            self::zeroed(),
+            self::zeroed(),
+            self::zeroed(),
+        ],..self::zeroed()
+    };
+}
+
+impl Renderer {
+    fn create_vertex_buffer(
+        device: &ID3D11Device,
+        data: &[VertexData],
+    )-> Result<ID3D11Buffer> {
+        let mut vertex_buffer = None;
+        unsafe { device.CreateBuffer(
+            &D3D11_BUFFER_DESC {
+                ByteWidth: mem::size_of_val(data) as _,
+                Usage: D3D11_USAGE_IMMUTABLE,
+                BindFlags: D3D11_BIND_VERTEX_BUFFER.0 as _,
+                ..D3D11_BUFFER_DESC::default()
+            },
+            Some(&D3D11_SUBRESOURCE_DATA {
+                pSysMem: data.as_ptr() as _,
+                ..D3D11_SUBRESOURCE_DATA::default()
+            }),
+            Some(&mut vertex_buffer))
+        }?;
+        Ok(vertex_buffer.unwrap())
+    }
+
+    fn create_index_buffer(
+        device: &ID3D11Device,
+        data: &[u32],
+    )-> Result<ID3D11Buffer> {
+        let mut index_buffer = None;
+        unsafe { device.CreateBuffer(
+            &D3D11_BUFFER_DESC {
+                ByteWidth: mem::size_of_val(data) as _,
+                Usage: D3D11_USAGE_IMMUTABLE,
+                BindFlags: D3D11_BIND_INDEX_BUFFER.0 as _,
+                ..D3D11_BUFFER_DESC::default()
+            },
+            Some(&D3D11_SUBRESOURCE_DATA {
+                pSysMem: data.as_ptr() as _,
+                ..D3D11_SUBRESOURCE_DATA::default()
+            }),
+            Some(&mut index_buffer))
+        }?;
+        Ok(index_buffer.unwrap())
+    }
+
+    fn get_render_target_size(rtv: &ID3D11RenderTargetView) -> Result<(u32, u32)> {
+        let tex = unsafe { rtv.GetResource() }?.cast::<ID3D11Texture2D>()?;
+        let mut desc = self::zeroed();
+        unsafe { tex.GetDesc(&mut desc) };
+        Ok((desc.Width, desc.Height))
+    }
+}
