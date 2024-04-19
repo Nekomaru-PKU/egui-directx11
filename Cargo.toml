@@ -1,6 +1,6 @@
 [package]
 name = "egui-directx11"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
@@ -13,7 +13,7 @@ keywords = ["gui", "egui", "dx11", "d3d11", "directx11"]
 
 [dependencies]
 log = "0.4.21"
-egui = "0.27.1"
+egui = "0.27.2"
 windows = { version = "0.54.0", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dxgi_Common",
@@ -23,7 +23,7 @@ windows = { version = "0.54.0", features = [
 ]}
 
 [dev-dependencies]
-egui_demo_lib = "0.27.1"
-egui-winit = { version = "0.27.1", default-features = false }
+egui_demo_lib = "0.27.2"
+egui-winit = { version = "0.27.2", default-features = false }
 pretty_env_logger = "0.5.0"
-winit = { version = "0.29.10", default-features = false, features = ["rwh_06"] }
+winit = { version = "0.29.15", default-features = false, features = ["rwh_06"] }

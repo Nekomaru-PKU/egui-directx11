@@ -18,7 +18,6 @@ use winit::{
     },
     event_loop::EventLoop,
     raw_window_handle::{
-        HasDisplayHandle,
         HasWindowHandle,
         RawWindowHandle,
     },
@@ -58,18 +57,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut egui_winit = egui_winit::State::new(
         egui_ctx.clone(),
         egui_ctx.viewport_id(),
-        &window.display_handle()?,
+        &window,
         None,
         None);
     let mut egui_demo = egui_demo_lib::DemoWindows::default();
 
-    event_loop.run(move |event, control_flow| match event {
+    event_loop.run(move |event, event_loop| match event {
         Event::AboutToWait => window.request_redraw(),
         Event::WindowEvent { window_id, event } => {
             if window_id != window.id() { return; }
             if egui_winit.on_window_event(&window, &event).consumed { return; }
             match event {
-                WindowEvent::CloseRequested => control_flow.exit(),
+                WindowEvent::CloseRequested => event_loop.exit(),
                 WindowEvent::Resized(PhysicalSize {
                     width: new_width,
                     height: new_height,
