@@ -175,6 +175,8 @@ impl Renderer {
     /// confused with [`egui::Context::zoom_factor`]. If you are using `winit`,
     /// the `scale_factor` can be aquired using `Window::scale_factor`.
     /// 
+    /// ## Error Handling
+    /// 
     /// If any Direct3D resource creation fails, this function will return an error.
     /// In this case you may have a incomplete or incorrect rendering result.
     /// You can create the Direct3D11 device with debug layer enabled to find out
@@ -182,12 +184,23 @@ impl Renderer {
     /// If the device has been lost, you should drop the [`Renderer`] and create
     /// a new one.
     /// 
-    /// Note that this function does not maintain the current state of the
-    /// Direct3D11 graphics pipeline. Particularly, it calls
-    /// [`ID3D11DeviceContext::ClearState`](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicecontext-clearstate)
-    /// before and after rendering, so it is all *your* responsibility to backup
-    /// the current pipeline state and restore it afterwards if your rendering
-    /// pipeline depends on it.
+    /// ## Pipeline State Management
+    /// 
+    /// This function sets up its own Direct3D11 pipeline state for rendering on
+    /// the provided device context. It assumes that the hull shader, domain
+    /// shader and geometry shader stages are not active on the provided device
+    /// context without any further checks. It is all *your* responsibility to
+    /// backup the current pipeline state and restore it afterwards if your
+    /// rendering pipeline depends on it.
+    /// 
+    /// Particularly, it overrides:
+    /// + The input layout, vertex buffer, index buffer and primitive
+    /// topology in the input assembly stage;
+    /// + The current shader in the vertex shader stage;
+    /// + The viewport and rasterizer state in the rasterizer stage;
+    /// + The current shader, shader resource slot 0 and sampler slot 0
+    ///   in the pixel shader stage;
+    /// + The render target(s) and blend state in the output merger stage;
     /// 
     /// See the [`egui-demo`](https://github.com/Nekomaru-PKU/egui-directx11/blob/main/examples/egui-demo.rs)
     /// example for code examples.
@@ -253,23 +266,21 @@ impl Renderer {
                 &self.texture_pool,
                 mesh)?;
         }
-        unsafe { device_context.ClearState() };
         Ok(())
     }
 
     fn setup(
         &mut self,
-        device_context: &ID3D11DeviceContext,
+        ctx: &ID3D11DeviceContext,
         render_target: &ID3D11RenderTargetView,
         frame_size: (u32, u32)) {
         unsafe {
-            device_context.ClearState();
-            device_context.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            device_context.IASetInputLayout(&self.input_layout);
-            device_context.VSSetShader(&self.vertex_shader, Some(&[]));
-            device_context.PSSetShader(&self.pixel_shader, Some(&[]));
-            device_context.RSSetState(&self.rasterizer_state);
-            device_context.RSSetViewports(Some(&[D3D11_VIEWPORT {
+            ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            ctx.IASetInputLayout(&self.input_layout);
+            ctx.VSSetShader(&self.vertex_shader, None);
+            ctx.PSSetShader(&self.pixel_shader, None);
+            ctx.RSSetState(&self.rasterizer_state);
+            ctx.RSSetViewports(Some(&[D3D11_VIEWPORT {
                 TopLeftX: 0.,
                 TopLeftY: 0.,
                 Width : frame_size.0 as _,
@@ -277,13 +288,13 @@ impl Renderer {
                 MinDepth: 0.,
                 MaxDepth: 1.,
             }]));
-            device_context.PSSetSamplers(
+            ctx.PSSetSamplers(
                 0,
                 Some(&[Some(self.sampler_state.clone())]));
-            device_context.OMSetRenderTargets(
+            ctx.OMSetRenderTargets(
                 Some(&[Some(render_target.clone())]),
                 None);
-            device_context.OMSetBlendState(
+            ctx.OMSetBlendState(
                 &self.blend_state,
                 Some(&[0.; 4]),
                 u32::MAX);
