@@ -1,6 +1,6 @@
 [package]
 name = "egui-directx11"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
@@ -14,7 +14,7 @@ keywords = ["gui", "egui", "dx11", "d3d11", "directx11"]
 [dependencies]
 log = "0.4.21"
 egui = "0.27.2"
-windows = { version = "0.54.0", features = [
+windows = { version = "0.56.0", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dxgi_Common",
     "Win32_Graphics_Dxgi",
