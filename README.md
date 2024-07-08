@@ -1,4 +1,4 @@
-# `egui-directx11`: a minimal Direct3D11 renderer for [`egui`](https://crates.io/crates/egui)
+# `egui-directx11`: a Direct3D11 renderer for [`egui`](https://crates.io/crates/egui)
 
 This crate aims to provide a *minimal* set of features and APIs to render
 outputs from `egui` using Direct3D11.

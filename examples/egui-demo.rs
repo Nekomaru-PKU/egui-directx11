@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build(&event_loop)?;
     let hwnd = if let RawWindowHandle::Win32(raw) =
         window.window_handle()?.as_raw() {
-        HWND(raw.hwnd.get())
+        HWND(raw.hwnd.get() as _)
     } else {
         panic!("unexpected RawWindowHandle variant");
     };
@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         &egui_ctx,
                         renderer_output,
                         window.scale_factor() as _);
-                    let _ = unsafe { swap_chain.Present(1, 0) };
+                    let _ = unsafe { swap_chain.Present(1, DXGI_PRESENT(0)) };
                 } else { unreachable!() }, _ => ()
             }
         }, _ => ()
@@ -127,7 +127,7 @@ fn resize_swap_chain_and_render_target(
             new_width,
             new_height,
             new_format,
-            0)
+            DXGI_SWAP_CHAIN_FLAG(0))
     }?;
     render_target.replace(
         create_render_target_for_swap_chain(device, swap_chain)?);
