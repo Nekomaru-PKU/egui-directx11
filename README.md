@@ -25,9 +25,22 @@ from the [`windows`](https://crates.io/crates/windows) crate [maintained by
 Microsoft](https://github.com/microsoft/windows-rs). Using this crate with
 other Direct3D11 bindings is not recommended and may result in unexpected behavior.
 
-This crate is in early development. It should work in most cases but may lack
-certain features or functionalities.
+## Project Status and Versioning Compatibility on `windows` and `egui`
 
+This crate has been considered as general available without known issues since
+version `0.3.1`. Though, it keeps bumping major version to follow major version
+bumps on its direct dependencies, namely `windows` and  `egui`.
+
+To select a version for this crate according to the `windows` and `egui` version
+your project uses, please check the table below:
+
+|`egui-directx11`|`windows`|`egui`|
+|-|-|-|
+|0.5.0|0.58.0|0.28.x|
+|0.4.0|0.56.0|0.27.x|
+|0.3.1|0.54.0|0.27.x|
+
+Releases of this crate before `0.3.1` are considered premature and are not recommended to use.
 
 ## License
 

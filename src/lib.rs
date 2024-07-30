@@ -195,7 +195,7 @@ impl Renderer {
     /// 
     /// Particularly, it overrides:
     /// + The input layout, vertex buffer, index buffer and primitive
-    /// topology in the input assembly stage;
+    ///   topology in the input assembly stage;
     /// + The current shader in the vertex shader stage;
     /// + The viewport and rasterizer state in the rasterizer stage;
     /// + The current shader, shader resource slot 0 and sampler slot 0
