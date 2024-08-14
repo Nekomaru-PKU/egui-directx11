@@ -29,35 +29,20 @@ use texture::TexturePool;
 
 use std::mem;
 
-const fn zeroed<T>() -> T { unsafe { mem::zeroed() } }
+const fn zeroed<T>() -> T {
+    unsafe { mem::zeroed() }
+}
 
 use egui::{
-    epaint::{
-        textures::TexturesDelta,
-        ClippedShape,
-        Primitive,
-        Vertex,
-    },
-    ClippedPrimitive,
-    Pos2,
-    Rgba,
+    epaint::{textures::TexturesDelta, ClippedShape, Primitive, Vertex},
+    ClippedPrimitive, Pos2, Rgba,
 };
 
 use windows::{
-    core::{
-        Interface,
-        Result,
-    },
+    core::{Interface, Result},
     Win32::{
-        Foundation::{
-            BOOL,
-            RECT,
-        },
-        Graphics::{
-            Direct3D::*,
-            Direct3D11::*,
-            Dxgi::Common::*,
-        },
+        Foundation::{BOOL, RECT},
+        Graphics::{Direct3D::*, Direct3D11::*, Dxgi::Common::*},
     },
 };
 

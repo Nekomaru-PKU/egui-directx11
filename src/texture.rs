@@ -8,25 +8,13 @@
 //
 // Nekomaru, March 2024
 
-use std::{
-    collections::HashMap,
-    mem,
-    slice,
-};
+use std::{collections::HashMap, mem, slice};
 
-use egui::{
-    Color32,
-    ImageData,
-    TextureId,
-    TexturesDelta,
-};
+use egui::{Color32, ImageData, TextureId, TexturesDelta};
 
 use windows::{
     core::Result,
-    Win32::Graphics::{
-        Direct3D11::*,
-        Dxgi::Common::*,
-    },
+    Win32::Graphics::{Direct3D11::*, Dxgi::Common::*},
 };
 
 struct Texture {

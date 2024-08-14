@@ -1,29 +1,17 @@
 use windows::Win32::{
-    Foundation::{
-        BOOL,
-        HWND,
-    },
+    Foundation::{BOOL, HWND},
     Graphics::{
         Direct3D::*,
         Direct3D11::*,
-        Dxgi::{
-            Common::*,
-            *,
-        },
+        Dxgi::{Common::*, *},
     },
 };
 
 use winit::{
     dpi::PhysicalSize,
-    event::{
-        Event,
-        WindowEvent,
-    },
+    event::{Event, WindowEvent},
     event_loop::EventLoop,
-    raw_window_handle::{
-        HasWindowHandle,
-        RawWindowHandle,
-    },
+    raw_window_handle::{HasWindowHandle, RawWindowHandle},
     window::WindowBuilder,
 };
 
@@ -77,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 WindowEvent::Resized(PhysicalSize {
                     width: new_width,
                     height: new_height,
-                }) =>
+                }) => {
                     if let Err(err) = resize_swap_chain_and_render_target(
                         &device,
                         &swap_chain,
@@ -87,8 +75,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
                     ) {
                         panic!("fail to resize framebuffers: {err:?}");
-                    },
-                WindowEvent::RedrawRequested =>
+                    }
+                },
+                WindowEvent::RedrawRequested => {
                     if let Some(render_target) = &render_target {
                         let egui_input = egui_winit.take_egui_input(&window);
                         let egui_output = egui_ctx.run(egui_input, |ctx| {
@@ -100,10 +89,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .handle_platform_output(&window, platform_output);
 
                         unsafe {
-                            device_context
-                                .ClearRenderTargetView(render_target, &[
-                                    0.0, 0.0, 0.0, 1.0,
-                                ]);
+                            device_context.ClearRenderTargetView(
+                                render_target,
+                                &[0.0, 0.0, 0.0, 1.0],
+                            );
                         }
                         let _ = egui_renderer.render(
                             &device_context,
@@ -116,7 +105,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             unsafe { swap_chain.Present(1, DXGI_PRESENT(0)) };
                     } else {
                         unreachable!()
-                    },
+                    }
+                },
                 _ => (),
             }
         },
