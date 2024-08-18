@@ -97,6 +97,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let _ = egui_renderer.render(
                             &device_context,
                             render_target,
+                            None,
                             &egui_ctx,
                             renderer_output,
                             window.scale_factor() as _,

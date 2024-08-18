@@ -206,6 +206,7 @@ impl Renderer {
         &mut self,
         device_context: &ID3D11DeviceContext,
         render_target: &ID3D11RenderTargetView,
+        depth_stencil_target: Option<&ID3D11DepthStencilView>,
         egui_ctx: &egui::Context,
         egui_output: RendererOutput,
         scale_factor: f32,
@@ -224,7 +225,12 @@ impl Renderer {
         );
         let zoom_factor = egui_ctx.zoom_factor();
 
-        self.setup(device_context, render_target, frame_size);
+        self.setup(
+            device_context,
+            render_target,
+            depth_stencil_target,
+            frame_size,
+        );
         let meshes = egui_ctx
             .tessellate(egui_output.shapes, egui_output.pixels_per_point)
             .into_iter()
@@ -286,6 +292,7 @@ impl Renderer {
         &mut self,
         ctx: &ID3D11DeviceContext,
         render_target: &ID3D11RenderTargetView,
+        depth_stencil_target: Option<&ID3D11DepthStencilView>,
         frame_size: (u32, u32),
     ) {
         unsafe {
@@ -303,7 +310,10 @@ impl Renderer {
                 MaxDepth: 1.,
             }]));
             ctx.PSSetSamplers(0, Some(&[Some(self.sampler_state.clone())]));
-            ctx.OMSetRenderTargets(Some(&[Some(render_target.clone())]), None);
+            ctx.OMSetRenderTargets(
+                Some(&[Some(render_target.clone())]),
+                depth_stencil_target,
+            );
             ctx.OMSetBlendState(&self.blend_state, Some(&[0.; 4]), u32::MAX);
         }
     }
@@ -314,17 +324,17 @@ impl Renderer {
         texture_pool: &TexturePool,
         mesh: MeshData,
     ) -> Result<()> {
-        let vb = Self::create_index_buffer(device, &mesh.idx)?;
-        let ib = Self::create_vertex_buffer(device, &mesh.vtx)?;
+        let ib = Self::create_index_buffer(device, &mesh.idx)?;
+        let vb = Self::create_vertex_buffer(device, &mesh.vtx)?;
         unsafe {
             device_context.IASetVertexBuffers(
                 0,
                 1,
-                Some(&Some(ib)),
+                Some(&Some(vb.clone())),
                 Some(&(mem::size_of::<VertexData>() as _)),
                 Some(&0),
             );
-            device_context.IASetIndexBuffer(&vb, DXGI_FORMAT_R32_UINT, 0);
+            device_context.IASetIndexBuffer(&ib, DXGI_FORMAT_R32_UINT, 0);
             device_context.RSSetScissorRects(Some(&[RECT {
                 left: mesh.clip_rect.left() as _,
                 top: mesh.clip_rect.top() as _,
