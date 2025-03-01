@@ -1,5 +1,8 @@
+use std::ptr;
+
+use windows::core::BOOL;
 use windows::Win32::{
-    Foundation::{BOOL, HWND},
+    Foundation::{HWND, HMODULE},
     Graphics::{
         Direct3D::{D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL_11_0},
         Direct3D11::*,
@@ -158,7 +161,7 @@ impl DemoApp {
             D3D11CreateDevice(
                 &dxgi_adapter,
                 D3D_DRIVER_TYPE_UNKNOWN,
-                None,
+                HMODULE(ptr::null_mut()),
                 if cfg!(debug_assertions) {
                     D3D11_CREATE_DEVICE_DEBUG
                 } else {

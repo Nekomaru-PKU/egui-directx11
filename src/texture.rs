@@ -47,7 +47,10 @@ impl TexturePool {
         delta: TexturesDelta,
     ) -> Result<()> {
         for (tid, delta) in delta.set {
-            if delta.is_whole() {
+            if delta.is_whole()
+                && delta.image.width() > 0
+                && delta.image.height() > 0
+            {
                 self.pool.insert(
                     tid,
                     Self::create_texture(&self.device, delta.image)?,
