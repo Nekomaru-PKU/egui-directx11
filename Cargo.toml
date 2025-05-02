@@ -1,7 +1,7 @@
 [package]
 name = "egui-directx11"
-version = "0.7.0"
-edition = "2021"
+version = "0.8.0"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 
 repository = "https://github.com/Nekomaru-PKU/egui-directx11"
@@ -12,16 +12,16 @@ categories = ["gui", "game-development"]
 keywords = ["gui", "egui", "dx11", "d3d11", "directx11"]
 
 [dependencies]
-log = "0.4.26"
-egui = "0.31.0"
-windows = { version = "0.60.0", features = [
+log = "0.4.27"
+egui = "0.31.1"
+windows = { version = "0.61.1", features = [
     "Win32_Graphics_Dxgi_Common",
     "Win32_Graphics_Direct3D",
     "Win32_Graphics_Direct3D11",
 ]}
 
 [dev-dependencies]
-egui_demo_lib = "0.31.0"
-egui-winit = { version = "0.31.0", default-features = false }
+egui_demo_lib = "0.31.1"
+egui-winit = { version = "0.31.1", default-features = false }
 pretty_env_logger = "0.5.0"
-winit = { version = "0.30.9", default-features = false, features = ["rwh_06"] }
+winit = { version = "0.30.10", default-features = false, features = ["rwh_06"] }
