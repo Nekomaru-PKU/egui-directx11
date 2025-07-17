@@ -76,6 +76,12 @@ pub struct RendererOutput {
 
 /// Convenience method to split a [`egui::FullOutput`] into the
 /// [`RendererOutput`] part and other parts for platform integration.
+///
+/// The returned tuple should be destructured as:
+/// ```ignore
+/// let (renderer_output, platform_output, viewport_output) =
+///     egui_directx11::split_output(full_output);
+/// ```
 pub fn split_output(
     full_output: egui::FullOutput,
 ) -> (
@@ -401,7 +407,7 @@ impl Renderer {
         AddressW: D3D11_TEXTURE_ADDRESS_BORDER,
         ComparisonFunc: D3D11_COMPARISON_ALWAYS,
         BorderColor: [1., 1., 1., 1.],
-        ..self::zeroed()
+        ..zeroed()
     };
 
     const BLEND_DESC: D3D11_BLEND_DESC = D3D11_BLEND_DESC {
@@ -416,15 +422,15 @@ impl Renderer {
                 BlendOpAlpha: D3D11_BLEND_OP_ADD,
                 RenderTargetWriteMask: D3D11_COLOR_WRITE_ENABLE_ALL.0 as _,
             },
-            self::zeroed(),
-            self::zeroed(),
-            self::zeroed(),
-            self::zeroed(),
-            self::zeroed(),
-            self::zeroed(),
-            self::zeroed(),
+            zeroed(),
+            zeroed(),
+            zeroed(),
+            zeroed(),
+            zeroed(),
+            zeroed(),
+            zeroed(),
         ],
-        ..self::zeroed()
+        ..zeroed()
     };
 }
 
@@ -479,7 +485,7 @@ impl Renderer {
         rtv: &ID3D11RenderTargetView,
     ) -> Result<(u32, u32)> {
         let tex = unsafe { rtv.GetResource() }?.cast::<ID3D11Texture2D>()?;
-        let mut desc = self::zeroed();
+        let mut desc = zeroed();
         unsafe { tex.GetDesc(&mut desc) };
         Ok((desc.Width, desc.Height))
     }

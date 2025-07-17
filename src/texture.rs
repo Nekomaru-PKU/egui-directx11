@@ -94,7 +94,7 @@ impl TexturePool {
             output
         };
         match image {
-            ImageData::Font(f) => {
+            ImageData::Color(f) => {
                 let data = unsafe {
                     let slice = slice::from_raw_parts_mut(
                         subr.pData as *mut Color32,
@@ -107,29 +107,15 @@ impl TexturePool {
                     slice
                 };
 
-                let new: Vec<Color32> = f
-                    .pixels
-                    .iter()
-                    .map(|a| {
-                        Color32::from_rgba_premultiplied(
-                            255,
-                            255,
-                            255,
-                            (a * 255.) as u8,
-                        )
-                    })
-                    .collect();
-
                 for y in 0..f.height() {
                     for x in 0..f.width() {
                         let whole = (ny + y) * old.width + nx + x;
                         let frac = y * f.width() + x;
-                        old.pixels[whole] = new[frac];
-                        data[whole] = new[frac];
+                        old.pixels[whole] = f.pixels[frac];
+                        data[whole] = f.pixels[frac];
                     }
                 }
             },
-            _ => unreachable!(),
         }
         unsafe { ctx.Unmap(&old.tex, 0) };
         Ok(())
@@ -143,18 +129,6 @@ impl TexturePool {
 
         let pixels = match &data {
             ImageData::Color(c) => c.pixels.clone(),
-            ImageData::Font(f) => f
-                .pixels
-                .iter()
-                .map(|a| {
-                    Color32::from_rgba_premultiplied(
-                        255,
-                        255,
-                        255,
-                        (a * 255.) as u8,
-                    )
-                })
-                .collect(),
         };
 
         let desc = D3D11_TEXTURE2D_DESC {

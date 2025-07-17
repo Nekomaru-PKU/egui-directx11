@@ -36,6 +36,7 @@ your project uses, please check the table below:
 
 |`egui-directx11`|`windows`|`egui`|
 |-|-|-|
+|0.9.0|0.61.0|0.32.x|
 |0.8.0|0.61.0|0.31.x|
 |0.7.0|0.60.0|0.31.x|
 |0.6.0|0.58.0|0.29.x|
