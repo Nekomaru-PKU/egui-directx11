@@ -34,14 +34,14 @@ const fn zeroed<T>() -> T {
 }
 
 use egui::{
-    epaint::{textures::TexturesDelta, ClippedShape, Primitive, Vertex},
     ClippedPrimitive, Pos2, Rgba,
+    epaint::{ClippedShape, Primitive, Vertex, textures::TexturesDelta},
 };
 
-use windows::core::{Interface, Result};
-use windows::core::BOOL;
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::{Direct3D::*, Direct3D11::*, Dxgi::Common::*};
+use windows::core::BOOL;
+use windows::core::{Interface, Result};
 
 /// The core of this crate. You can set up a renderer via [`Renderer::new`]
 /// and render the output from `egui` with [`Renderer::render`].

@@ -13,8 +13,8 @@ use std::{collections::HashMap, mem, slice};
 use egui::{Color32, ImageData, TextureId, TexturesDelta};
 
 use windows::{
-    core::Result,
     Win32::Graphics::{Direct3D11::*, Dxgi::Common::*},
+    core::Result,
 };
 
 struct Texture {
@@ -65,7 +65,9 @@ impl TexturePool {
                     delta.pos.unwrap(),
                 )?;
             } else {
-                log::warn!("egui wants to update a non-existing texture {tid:?}. this request will be ignored.");
+                log::warn!(
+                    "egui wants to update a non-existing texture {tid:?}. this request will be ignored."
+                );
             }
         }
         for tid in delta.free {
