@@ -47,10 +47,10 @@ use windows::core::{Interface, Result};
 /// and render the output from `egui` with [`Renderer::render`].
 pub struct Renderer {
     device: ID3D11Device,
-
     input_layout: ID3D11InputLayout,
     vertex_shader: ID3D11VertexShader,
     pixel_shader: ID3D11PixelShader,
+    pixel_shader_gamma: ID3D11PixelShader,
     rasterizer_state: ID3D11RasterizerState,
     sampler_state: ID3D11SamplerState,
     blend_state: ID3D11BlendState,
@@ -126,6 +126,7 @@ impl Renderer {
         let mut input_layout = None;
         let mut vertex_shader = None;
         let mut pixel_shader = None;
+        let mut pixel_shader_gamma = None;
         let mut rasterizer_state = None;
         let mut sampler_state = None;
         let mut blend_state = None;
@@ -145,6 +146,11 @@ impl Renderer {
                 None,
                 Some(&mut pixel_shader),
             )?;
+            device.CreatePixelShader(
+                Self::PS_GAMMA_BLOB,
+                None,
+                Some(&mut pixel_shader_gamma),
+            )?;
             device.CreateRasterizerState(
                 &Self::RASTERIZER_DESC,
                 Some(&mut rasterizer_state),
@@ -161,6 +167,7 @@ impl Renderer {
             input_layout: input_layout.unwrap(),
             vertex_shader: vertex_shader.unwrap(),
             pixel_shader: pixel_shader.unwrap(),
+            pixel_shader_gamma: pixel_shader_gamma.unwrap(),
             rasterizer_state: rasterizer_state.unwrap(),
             sampler_state: sampler_state.unwrap(),
             blend_state: blend_state.unwrap(),
@@ -213,6 +220,47 @@ impl Renderer {
         egui_output: RendererOutput,
         scale_factor: f32,
     ) -> Result<()> {
+        self.render_common(
+            device_context,
+            render_target,
+            egui_ctx,
+            egui_output,
+            scale_factor,
+            false,
+        )
+    }
+
+    /// Render the gamma-encoded output of `egui` to the provided render target using the
+    /// provided device context.
+    ///
+    /// See [`Renderer::render`] for more details.
+    pub fn render_gamma(
+        &mut self,
+        device_context: &ID3D11DeviceContext,
+        render_target: &ID3D11RenderTargetView,
+        egui_ctx: &egui::Context,
+        egui_output: RendererOutput,
+        scale_factor: f32,
+    ) -> Result<()> {
+        self.render_common(
+            device_context,
+            render_target,
+            egui_ctx,
+            egui_output,
+            scale_factor,
+            true,
+        )
+    }
+
+    fn render_common(
+        &mut self,
+        device_context: &ID3D11DeviceContext,
+        render_target: &ID3D11RenderTargetView,
+        egui_ctx: &egui::Context,
+        egui_output: RendererOutput,
+        scale_factor: f32,
+        gamma: bool,
+    ) -> Result<()> {
         self.texture_pool
             .update(device_context, egui_output.textures_delta)?;
 
@@ -227,7 +275,7 @@ impl Renderer {
         );
         let zoom_factor = egui_ctx.zoom_factor();
 
-        self.setup(device_context, render_target, frame_size);
+        self.setup(device_context, render_target, frame_size, gamma);
         let meshes = egui_ctx
             .tessellate(egui_output.shapes, egui_output.pixels_per_point)
             .into_iter()
@@ -290,12 +338,17 @@ impl Renderer {
         ctx: &ID3D11DeviceContext,
         render_target: &ID3D11RenderTargetView,
         frame_size: (u32, u32),
+        gamma: bool,
     ) {
         unsafe {
             ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             ctx.IASetInputLayout(&self.input_layout);
             ctx.VSSetShader(&self.vertex_shader, None);
-            ctx.PSSetShader(&self.pixel_shader, None);
+            if gamma {
+                ctx.PSSetShader(&self.pixel_shader_gamma, None);
+            } else {
+                ctx.PSSetShader(&self.pixel_shader, None);
+            }
             ctx.RSSetState(&self.rasterizer_state);
             ctx.RSSetViewports(Some(&[D3D11_VIEWPORT {
                 TopLeftX: 0.,
@@ -354,8 +407,10 @@ impl Renderer {
 }
 
 impl Renderer {
-    const VS_BLOB: &'static [u8] = include_bytes!("../shaders/egui_vs.bin");
-    const PS_BLOB: &'static [u8] = include_bytes!("../shaders/egui_ps.bin");
+    const VS_BLOB: &'static [u8] = include_bytes!("../shaders/vs_egui.bin");
+    const PS_BLOB: &'static [u8] = include_bytes!("../shaders/ps_egui.bin");
+    const PS_GAMMA_BLOB: &'static [u8] =
+        include_bytes!("../shaders/ps_egui_gamma.bin");
 
     const INPUT_ELEMENTS_DESC: [D3D11_INPUT_ELEMENT_DESC; 3] = [
         D3D11_INPUT_ELEMENT_DESC {
