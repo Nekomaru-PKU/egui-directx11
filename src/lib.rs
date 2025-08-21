@@ -469,11 +469,11 @@ impl Renderer {
         RenderTarget: [
             D3D11_RENDER_TARGET_BLEND_DESC {
                 BlendEnable: BOOL(1),
-                SrcBlend: D3D11_BLEND_SRC_ALPHA,
+                SrcBlend: D3D11_BLEND_ONE,
                 DestBlend: D3D11_BLEND_INV_SRC_ALPHA,
                 BlendOp: D3D11_BLEND_OP_ADD,
-                SrcBlendAlpha: D3D11_BLEND_ONE,
-                DestBlendAlpha: D3D11_BLEND_INV_SRC_ALPHA,
+                SrcBlendAlpha: D3D11_BLEND_INV_DEST_ALPHA,
+                DestBlendAlpha: D3D11_BLEND_ONE,
                 BlendOpAlpha: D3D11_BLEND_OP_ADD,
                 RenderTargetWriteMask: D3D11_COLOR_WRITE_ENABLE_ALL.0 as _,
             },
