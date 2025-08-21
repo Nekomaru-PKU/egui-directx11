@@ -3,6 +3,15 @@
 This crate aims to provide a *minimal* set of features and APIs to render
 outputs from `egui` using Direct3D11.
 
+**NOTICE: Due to `egui` requiring **all** color blending performed in gamma space,
+`Render::render` requires the provided render target to be in the gamma color space
+and viewed as non-sRGB-aware since version 0.9.0. Rendering to linear render targets
+have been discontinued**.
+
+If you have to render to a render target in linear color space or is sRGB-aware,
+you must create an intermediate render target in gamma color space and perform a
+blit operation afterwards.
+
 ## Quick Start
 
 There is an [`egui-demo`](examples/egui-demo.rs) example, which demonstrates all you need to do to set up a minimal application

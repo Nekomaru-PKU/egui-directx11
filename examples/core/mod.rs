@@ -65,7 +65,7 @@ impl<T> AppCore<T> {
                 HWND(window_handle.hwnd.get() as _),
                 width,
                 height,
-                DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+                DXGI_FORMAT_R8G8B8A8_UNORM,
             )
             .expect("Failed to create device and swap chain");
 
@@ -159,7 +159,7 @@ impl<T> AppCore<T> {
             &mut self.render_target,
             width,
             height,
-            DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
         )
         .expect("Failed to resize swap chain and render target");
     }
