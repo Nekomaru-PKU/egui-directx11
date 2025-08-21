@@ -3,7 +3,29 @@
 This crate aims to provide a *minimal* set of features and APIs to render
 outputs from `egui` using Direct3D11.
 
----
+## NOTICE: Breaking Change in Version 0.10.0
+
+Due to `egui` requiring **all** color blending performed in gamma space to
+produce correct results, **render target passed to `Render::render`
+MUST be in the gamma color space and viewed as non-sRGB-aware** since version 0.10.0.
+**This is a breaking change when upgrading to version 0.10.0 from a previous version**.
+
+**Support for rendering to linear render targets have been discontinued**.
+If you have to render to a render target in linear color space, you must create an
+intermediate render target in gamma color space and perform a blit operation afterwards.
+
+## Examples
+
+For a quick start, `examples/main.rs` demonstrates how to set up a minimal application
+with Direct3D11 and `egui`.
+
++ Run `cargo run --example main` for the `egui` demo;
++ Run `cargo run --example main -- color-test` for the `egui` color test;
+
+Provided examples use `winit` for window management and event handling,
+while native Win32 APIs also works well.
+
+## Considerations
 
 This crate is a successor to [`egui-d3d11`](https://crates.io/crates/egui-d3d11),
 which is no longer maintained and has certain issues or inconvenience in some cases.
@@ -19,28 +41,18 @@ from the [`windows`](https://crates.io/crates/windows) crate [maintained by
 Microsoft](https://github.com/microsoft/windows-rs). Using this crate with
 other Direct3D11 bindings is not recommended and may result in unexpected behavior.
 
----
-
-This repo provides examples demonstrating how to set up a minimal application
-with Direct3D11 and `egui`. The examples uses `winit` for window management and event
-handling, while native Win32 APIs also works well.
+## Stability and Versioning
 
 This crate has been considered as general available without known issues since
 version `0.10.0`. Though, it keeps bumping major version to follow major version
 bumps on its direct dependencies, namely `windows` and  `egui`. Releases of this
 crate before `0.10.0` are considered premature and are not recommended to use.
 
-**NOTICE**: Due to `egui` requiring **all** color blending performed in gamma space to
-produce correct results, render target passed to `Render::render`
-**MUST be in the gamma color space and viewed as non-sRGB-aware** since version 0.10.0.
-**This is a breaking change when upgrading to version 0.10.0 from a previous version**.
+Breaking changes across *major* versions are generally avoided, but is not guaranteed.
+Minor and patch version bumps are guaranteed to be backward compatible without
+behavior or visual changes.
 
-**Support for rendering to linear render targets have been discontinued**.
-If you have to render to a render target in linear color space or is sRGB-aware,
-you must create an intermediate render target in gamma color space and perform a
-blit operation afterwards.
-
----
+## License and Contribution
 
 This repo and the `egui-directx11` crate is licensed under either of
 

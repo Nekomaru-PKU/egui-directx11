@@ -168,12 +168,12 @@ impl Renderer {
     }
 
     /// Render the output of `egui` to the provided `render_target`.
-    /// 
+    ///
     /// As `egui` requires color blending in gamma space, **the provided
     /// `render_target` MUST be in the gamma color space and viewed as
     /// non-sRGB-aware** (i.e. do NOT use `_SRGB` format in the texture and
     /// the view).
-    /// 
+    ///
     /// If you have to render to a render target in linear color space or
     /// one that is sRGB-aware, you must create an intermediate render target
     /// in gamma color space and perform a blit operation afterwards.
