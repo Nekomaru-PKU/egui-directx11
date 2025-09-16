@@ -1,4 +1,6 @@
-use std::ptr;
+use std::{env, ptr};
+
+use egui::*;
 
 use windows::Win32::{
     Foundation::{HMODULE, HWND},
@@ -8,14 +10,12 @@ use windows::Win32::{
         Dxgi::{Common::*, *},
     },
 };
-use windows::core::BOOL;
 
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
-    raw_window_handle::{HasWindowHandle, RawWindowHandle},
     window::{Window, WindowAttributes, WindowId},
 };
 
@@ -35,30 +35,39 @@ struct DemoState {
 
 impl DemoState {
     fn ui(&mut self, ctx: &egui::Context) {
-        let args = std::env::args().skip(1).collect::<Vec<_>>();
+        let args = env::args().skip(1).collect::<Vec<_>>();
         let args = args.iter().map(String::as_str).collect::<Vec<_>>();
         match &args[..] {
             [] => self.egui_demo.ui(ctx),
-            ["color-test"] => {
-                use egui::*;
-                let screen_rect = ctx.input(|input| input.screen_rect);
-                let window_height = screen_rect.height() - 60.0;
-
-                Window::new("Color Test")
-                    .pivot(Align2::CENTER_CENTER)
-                    .fixed_pos(screen_rect.center())
-                    .default_height(window_height)
-                    .min_height(window_height)
-                    .max_height(window_height)
-                    .resizable(false)
-                    .collapsible(false)
-                    .show(ctx, |ui| {
-                        ScrollArea::vertical()
-                            .show(ui, |ui| self.egui_color_test.ui(ui))
-                    });
-            },
+            ["color-test"] => self.color_test(ctx),
             _ => panic!("Unknown arguments: {:?}", args),
         }
+    }
+
+    fn color_test(&mut self, ctx: &egui::Context) {
+        use egui::Window;
+
+        const WINDOW_WIDTH: f32 = 640.0;
+
+        let screen_rect = ctx.input(|input| input.screen_rect);
+        let window_height = screen_rect.height() - 60.0;
+
+        Window::new("Color Test")
+            .resizable(false)
+            .collapsible(false)
+            .pivot(Align2::CENTER_CENTER)
+            .fixed_pos(screen_rect.center())
+            .default_width(WINDOW_WIDTH)
+            .min_width(WINDOW_WIDTH)
+            .max_width(WINDOW_WIDTH)
+            .default_height(window_height)
+            .min_height(window_height)
+            .max_height(window_height)
+            .show(ctx, |ui| {
+                println!("{:?}", ui.available_size());
+                ScrollArea::vertical()
+                    .show(ui, |ui| self.egui_color_test.ui(ui))
+            });
     }
 }
 
@@ -80,6 +89,7 @@ trait App: Sized {
 
 impl App for DemoApp {
     fn new(window: &Window) -> Self {
+        use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
         let RawWindowHandle::Win32(window_handle) = window
             .window_handle()
             .expect("Failed to get window handle")
@@ -230,7 +240,7 @@ impl DemoApp {
             BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
             BufferCount: 2,
             OutputWindow: window,
-            Windowed: BOOL(1),
+            Windowed: true.into(),
             SwapEffect: DXGI_SWAP_EFFECT_DISCARD,
             Flags: 0,
         };
