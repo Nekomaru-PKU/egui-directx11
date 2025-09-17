@@ -214,7 +214,6 @@ impl Renderer {
         render_target: &ID3D11RenderTargetView,
         egui_ctx: &egui::Context,
         egui_output: RendererOutput,
-        scale_factor: f32,
     ) -> Result<()> {
         self.texture_pool
             .update(device_context, egui_output.textures_delta)?;
@@ -225,8 +224,8 @@ impl Renderer {
 
         let frame_size = Self::get_render_target_size(render_target)?;
         let frame_size_scaled = (
-            frame_size.0 as f32 / scale_factor,
-            frame_size.1 as f32 / scale_factor,
+            frame_size.0 as f32 / egui_output.pixels_per_point,
+            frame_size.1 as f32 / egui_output.pixels_per_point,
         );
         let zoom_factor = egui_ctx.zoom_factor();
 
@@ -279,7 +278,9 @@ impl Renderer {
                         .collect(),
                     idx: mesh.indices,
                     tex: mesh.texture_id,
-                    clip_rect: clip_rect * scale_factor * zoom_factor,
+                    clip_rect: clip_rect
+                        * egui_output.pixels_per_point
+                        * zoom_factor,
                 })
             });
         for mesh in meshes {
