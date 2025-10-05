@@ -227,7 +227,6 @@ impl Renderer {
             frame_size.0 as f32 / egui_output.pixels_per_point,
             frame_size.1 as f32 / egui_output.pixels_per_point,
         );
-        let zoom_factor = egui_ctx.zoom_factor();
 
         self.setup(device_context, render_target, frame_size);
         let meshes = egui_ctx
@@ -262,9 +261,9 @@ impl Renderer {
                         .into_iter()
                         .map(|Vertex { pos, uv, color }| VertexData {
                             pos: Pos2::new(
-                                pos.x * zoom_factor / frame_size_scaled.0 * 2.0
+                                pos.x / frame_size_scaled.0 * 2.0
                                     - 1.0,
-                                1.0 - pos.y * zoom_factor / frame_size_scaled.1
+                                1.0 - pos.y / frame_size_scaled.1
                                     * 2.0,
                             ),
                             uv,
@@ -279,8 +278,7 @@ impl Renderer {
                     idx: mesh.indices,
                     tex: mesh.texture_id,
                     clip_rect: clip_rect
-                        * egui_output.pixels_per_point
-                        * zoom_factor,
+                        * egui_output.pixels_per_point,
                 })
             });
         for mesh in meshes {
