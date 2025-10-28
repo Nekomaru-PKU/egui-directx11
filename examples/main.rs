@@ -139,7 +139,10 @@ impl App for DemoApp {
     }
 
     fn on_event(&mut self, window: &Window, event: &WindowEvent) {
-        let egui_response = self.egui_winit.on_window_event(&window, event);
+        let egui_response = self.egui_winit.on_window_event(window, event);
+        if egui_response.repaint {
+            window.request_redraw();
+        }
         if !egui_response.consumed {
             match event {
                 WindowEvent::Resized(new_size) => self.resize(new_size),
@@ -155,7 +158,7 @@ impl DemoApp {
         if let Some(render_target) = &self.render_target {
             let egui_input = self.egui_winit.take_egui_input(window);
             let egui_output = self.egui_ctx.run(egui_input, |ctx| {
-                self.state.ui(&ctx);
+                self.state.ui(ctx);
             });
             let (renderer_output, platform_output, _) =
                 egui_directx11::split_output(egui_output);
@@ -172,7 +175,6 @@ impl DemoApp {
                 render_target,
                 &self.egui_ctx,
                 renderer_output,
-                window.scale_factor() as _,
             );
             let _ = unsafe { self.swap_chain.Present(1, DXGI_PRESENT(0)) };
         } else {
@@ -336,25 +338,19 @@ impl<T: App> ApplicationHandler for AppRunner<T> {
         self.window.take();
     }
 
-    fn about_to_wait(&mut self, _: &ActiveEventLoop) {
-        if let Some(window) = self.window.as_ref() {
-            window.request_redraw();
-        }
-    }
-
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        if let Some(window) = self.window.as_ref() {
-            if window_id == window.id() {
-                if event == WindowEvent::CloseRequested {
-                    event_loop.exit()
-                } else if let Some(app) = self.app.as_mut() {
-                    app.on_event(window, &event);
-                }
+        if let Some(window) = self.window.as_ref()
+            && window_id == window.id()
+        {
+            if event == WindowEvent::CloseRequested {
+                event_loop.exit()
+            } else if let Some(app) = self.app.as_mut() {
+                app.on_event(window, &event);
             }
         }
     }
