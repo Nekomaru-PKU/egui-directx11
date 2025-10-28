@@ -49,7 +49,7 @@ impl DemoState {
 
         const WINDOW_WIDTH: f32 = 640.0;
 
-        let screen_rect = ctx.input(|input| input.screen_rect);
+        let screen_rect = ctx.input(|input| input.content_rect());
         let window_height = screen_rect.height() - 60.0;
 
         Window::new("Color Test")
@@ -64,7 +64,6 @@ impl DemoState {
             .min_height(window_height)
             .max_height(window_height)
             .show(ctx, |ui| {
-                println!("{:?}", ui.available_size());
                 ScrollArea::vertical()
                     .show(ui, |ui| self.egui_color_test.ui(ui))
             });

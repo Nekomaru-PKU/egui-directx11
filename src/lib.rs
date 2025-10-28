@@ -86,7 +86,7 @@ pub fn split_output(
 ) -> (
     RendererOutput,
     egui::PlatformOutput,
-    egui::ViewportIdMap<egui::ViewportOutput>,
+    egui::OrderedViewportIdMap<egui::ViewportOutput>,
 ) {
     (
         RendererOutput {
