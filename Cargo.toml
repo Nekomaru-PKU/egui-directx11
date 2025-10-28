@@ -11,6 +11,9 @@ description = "This crate provides a Direct3D11 renderer for `egui`."
 categories = ["gui", "game-development"]
 keywords = ["gui", "egui", "dx11", "d3d11", "directx11"]
 
+[package.metadata.docs.rs]
+targets = ["x86_64-pc-windows-msvc"]
+
 [dependencies]
 log = "0.4.28"
 egui = "0.33.0"
