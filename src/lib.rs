@@ -16,11 +16,8 @@
 //! other Direct3D11 bindings is not recommended and may result in unexpected
 //! behavior.
 //!
-//! This crate is in early development. It should work in most cases but may
-//! lack certain features or functionalities.
-//!
 //! To get started, you can check the [`Renderer`] struct provided by this
-//! crate. You can also take a look at the [`egui-demo`](https://github.com/Nekomaru-PKU/egui-directx11/blob/main/examples/egui-demo.rs) example, which demonstrates all you need to do to set up a minimal application
+//! crate. You can also take a look at the [example](https://github.com/Nekomaru-PKU/egui-directx11/blob/main/examples/main.rs), which demonstrates all you need to do to set up a minimal application
 //! with Direct3D11 and `egui`. This example uses `winit` for window management
 //! and event handling, while native Win32 APIs should also work well.
 
