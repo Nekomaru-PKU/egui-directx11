@@ -167,6 +167,43 @@ impl Renderer {
         })
     }
 
+    /// Register a user-provided `ID3D11ShaderResourceView` and get a [`egui::TextureId`] for it.
+    ///
+    /// This allows you to use your own DirectX11 textures within egui. The returned
+    /// [`egui::TextureId`] can be used with [`egui::Image`], [`egui::ImageButton`], or
+    /// any other egui widget that accepts a texture ID.
+    ///
+    /// The texture will remain registered until you call [`Renderer::unregister_user_texture`]
+    /// or the [`Renderer`] is dropped.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Assuming you have a ID3D11ShaderResourceView
+    /// let texture_id = renderer.register_user_texture(my_srv);
+    ///
+    /// // Use it in egui
+    /// ui.image(egui::ImageSource::Texture(egui::load::SizedTexture::new(
+    ///     texture_id,
+    ///     egui::vec2(256.0, 256.0),
+    /// )));
+    /// ```
+    pub fn register_user_texture(
+        &mut self,
+        srv: ID3D11ShaderResourceView,
+    ) -> egui::TextureId {
+        self.texture_pool.register_user_texture(srv)
+    }
+
+    /// Unregister a user texture by its [`egui::TextureId`].
+    ///
+    /// Returns `true` if the texture was found and removed, `false` otherwise.
+    /// Note that this only works for user-registered textures, not textures
+    /// managed by egui itself.
+    pub fn unregister_user_texture(&mut self, tid: egui::TextureId) -> bool {
+        self.texture_pool.unregister_user_texture(tid)
+    }
+
     /// Render the output of `egui` to the provided `render_target`.
     ///
     /// As `egui` requires color blending in gamma space, **the provided
