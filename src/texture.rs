@@ -17,16 +17,33 @@ use windows::{
     core::Result,
 };
 
-struct Texture {
+struct ManagedTexture {
     tex: ID3D11Texture2D,
     srv: ID3D11ShaderResourceView,
     pixels: Vec<Color32>,
     width: usize,
 }
 
+enum Texture {
+    /// A texture managed by egui (created from ImageData)
+    Managed(ManagedTexture),
+    /// A user-provided texture (registered from an existing shader resource view)
+    User { srv: ID3D11ShaderResourceView },
+}
+impl Texture {
+    pub fn is_managed(&self) -> bool {
+        matches!(self, Texture::Managed(_))
+    }
+
+    pub fn is_user(&self) -> bool {
+        matches!(self, Texture::User { .. })
+    }
+}
+
 pub struct TexturePool {
     device: ID3D11Device,
     pool: HashMap<TextureId, Texture>,
+    next_user_texture_id: u64,
 }
 
 impl TexturePool {
@@ -34,11 +51,40 @@ impl TexturePool {
         Self {
             device: device.clone(),
             pool: HashMap::new(),
+            next_user_texture_id: 0,
         }
     }
 
     pub fn get_srv(&self, tid: TextureId) -> Option<ID3D11ShaderResourceView> {
-        self.pool.get(&tid).map(|t| t.srv.clone())
+        self.pool.get(&tid).map(|t| match t {
+            Texture::Managed(managed) => managed.srv.clone(),
+            Texture::User { srv } => srv.clone(),
+        })
+    }
+
+    /// Register a user-provided shader resource view and get a TextureId for it.
+    /// This TextureId can be used in egui to reference this texture.
+    ///
+    /// The returned TextureId will be unique and won't conflict with egui's managed textures.
+    pub fn register_user_texture(
+        &mut self,
+        srv: ID3D11ShaderResourceView,
+    ) -> TextureId {
+        let id = TextureId::User(self.next_user_texture_id);
+        self.next_user_texture_id += 1;
+        self.pool.insert(id, Texture::User { srv });
+        id
+    }
+
+    /// Unregister a user texture by its TextureId.
+    /// Returns true if the texture was found and removed, false otherwise.
+    pub fn unregister_user_texture(&mut self, tid: TextureId) -> bool {
+        if self.pool.get(&tid).is_some_and(|t| t.is_user()) {
+            self.pool.remove(&tid);
+            true
+        } else {
+            false
+        }
     }
 
     pub fn update(
@@ -53,11 +99,13 @@ impl TexturePool {
             {
                 self.pool.insert(
                     tid,
-                    Self::create_texture(&self.device, delta.image)?,
+                    Self::create_managed_texture(&self.device, delta.image)?,
                 );
                 // the old texture is returned and dropped here, freeing
                 // all its gpu resource.
-            } else if let Some(tex) = self.pool.get_mut(&tid) {
+            } else if let Some(tex) =
+                self.pool.get_mut(&tid).filter(|t| t.is_managed())
+            {
                 Self::update_partial(
                     ctx,
                     tex,
@@ -71,7 +119,9 @@ impl TexturePool {
             }
         }
         for tid in delta.free {
-            self.pool.remove(&tid);
+            if self.pool.get(&tid).is_some_and(|t| t.is_managed()) {
+                self.pool.remove(&tid);
+            }
         }
         Ok(())
     }
@@ -82,6 +132,13 @@ impl TexturePool {
         image: ImageData,
         [nx, ny]: [usize; 2],
     ) -> Result<()> {
+        let Texture::Managed(old) = old else {
+            log::warn!(
+                "attempted to partially update a user texture, which is not supported"
+            );
+            return Ok(());
+        };
+
         let subr = unsafe {
             let mut output = D3D11_MAPPED_SUBRESOURCE::default();
             ctx.Map(
@@ -121,7 +178,7 @@ impl TexturePool {
         Ok(())
     }
 
-    fn create_texture(
+    fn create_managed_texture(
         device: &ID3D11Device,
         data: ImageData,
     ) -> Result<Texture> {
@@ -167,11 +224,11 @@ impl TexturePool {
         unsafe { device.CreateShaderResourceView(&tex, None, Some(&mut srv)) }?;
         let srv = srv.unwrap();
 
-        Ok(Texture {
+        Ok(Texture::Managed(ManagedTexture {
             tex,
             srv,
             width,
             pixels,
-        })
+        }))
     }
 }
